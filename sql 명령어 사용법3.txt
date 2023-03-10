@@ -1,0 +1,185 @@
+
+# a6 DB 삭제/생성/선택
+DROP DATABASE IF EXISTS a6;
+CREATE DATABASE a6;
+USE a6;
+
+# 부서(홍보, 기획)
+# 주의 : INT(10)이 10바이트라는 강사의 설명은 잘못 되었습니다. 그냥 INT라고 쓰시면 됩니다.
+CREATE TABLE dept (
+    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    regDate DATETIME NOT NULL,
+    `name` CHAR(100) NOT NULL UNIQUE
+);
+
+INSERT INTO dept
+SET regDate = NOW(),
+`name` = '홍보';
+
+INSERT INTO dept
+SET regDate = NOW(),
+`name` = '기획';
+
+# 사원(홍길동/홍보/5000만원, 홍길순/홍보/6000만원, 임꺽정/기획/4000만원)
+# 주의 : INT(10)이 10바이트라는 강사의 설명은 잘못 되었습니다. 그냥 INT라고 쓰시면 됩니다.
+CREATE TABLE emp (
+    id INT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    regDate DATETIME NOT NULL,
+    `name` CHAR(100) NOT NULL,
+    deptId INT UNSIGNED NOT NULL,
+    salary INT UNSIGNED NOT NULL
+);
+
+INSERT INTO emp
+SET regDate = NOW(),
+`name` = '홍길동',
+deptId = 1,
+salary = 5000;
+
+INSERT INTO emp
+SET regDate = NOW(),
+`name` = '홍길순',
+deptId = 1,
+salary = 6000;
+
+INSERT INTO emp
+SET regDate = NOW(),
+`name` = '임꺽정',
+deptId = 2,
+salary = 4000;
+
+SELECT *FROM dept;
+SELECT *FROM emp;
+# 사원 수 출력
+# 집계 함수
+#
+SELECT COUNT(*)
+FROM emp;
+
+# 가장 큰 사원 번호 출력
+SELECT MAX(id)
+FROM emp;
+
+# 가장 고액 연봉
+SELECT MAX(salary)
+FROM emp;
+
+# 가장 저액 연봉
+SELECT MIN(salary)
+FROM emp;
+
+# 회사에서 1년 고정 지출(인건비)
+SELECT SUM(salary)
+FROM emp;
+
+# 부서별, 1년 고정 지출(인건비)
+SELECT deptId, SUM(salary)
+FROM emp
+GROUP BY deptId;
+
+# 부서별, 최고연봉
+SELECT deptId, MAX(salary)
+FROM emp
+GROUP BY deptId;
+
+# 부서별, 최저연봉
+SELECT deptId, MIN(salary)
+FROM emp
+GROUP BY deptId;
+
+# 부서별, 평균연봉
+SELECT deptId, AVG(salary)
+FROM emp
+GROUP BY deptId;
+
+
+
+
+# 부서별, 부서명, 사원리스트, 평균연봉, 최고연봉, 최소연봉, 사원수
+## V1(조인 안한 버전)
+SELECT E.deptId AS 부서번호,
+#GROUP_CONCAT는 다수의 정보를 보여줄떄 한줄로 전부 보여주는기능이다
+GROUP_CONCAT(E.name) AS 사원리스트,
+#TRUNCATE는 소수점을 버려주는 기능을 해준다 인자는 두개 사용하며 0번째 자리부터 지우겠다
+TRUNCATE(AVG(E.salary), 0) AS 평균연봉,
+MAX(E.salary) AS 최고연봉,
+MIN(E.salary) AS 최소연봉,
+COUNT(*) AS 사원수
+FROM emp AS E
+GROUP BY E.deptId;
+
+#select절 뒤에오는 컬럼명이 여러개 일때 집계 함수가 사용된 컬럼을 제외한 모든 컬럼은 그룹바이를 언급해야 한다
+#집계 함수는 무조건 그룹바이를 사용해야한다
+
+#그룹바이에 언급된 컬럼은 셀렉절에 존재해야한다
+
+## V2(조인해서 부서명까지 나오는 버전)
+SELECT D.name AS 부서,
+GROUP_CONCAT(E.name) AS 사원리스트,
+TRUNCATE(AVG(E.salary), 0) AS 평균연봉,
+MAX(E.salary) AS 최고연봉,
+MIN(E.salary) AS 최소연봉,
+COUNT(*) AS 사원수
+FROM emp AS E
+INNER JOIN dept AS D
+ON E.deptId = D.id
+GROUP BY E.deptId;
+
+## V3(V2에서 평균연봉이 5000이상인 부서로 추리기)
+SELECT D.name AS 부서,
+GROUP_CONCAT(E.name) AS 사원리스트,
+TRUNCATE(AVG(E.salary), 0) AS 평균연봉,
+MAX(E.salary) AS 최고연봉,
+MIN(E.salary) AS 최소연봉,
+COUNT(*) AS 사원수
+FROM emp AS E
+INNER JOIN dept AS D
+ON E.deptId = D.id
+GROUP BY E.deptId
+HAVING `평균연봉` >= 5000;
+
+/*
+쿼리문 순서
+select
+from
+join
+on
+where
+group by
+having
+order by
+*/
+
+## V4(V3에서 HAVING 없이 서브쿼리로 수행)
+### HINT, UNION을 이용한 서브쿼리
+#유니온은 컬럼의 수와 타입이 다르면 사용이 불가능 하다
+#유니온은 테이블의 구조가 같아야만 사용이가능하다
+#일반 유니온은 중복된 것을 보여주지 않는다
+#유니온 올은 중복된것도 보여준다
+# SELECT *
+# FROM (
+#     SELECT 1 AS id
+#     UNION
+#     SELECT 2
+#     UNION
+#     SELECT 3
+# ) AS A
+
+
+#서브 쿼리 - from() 안에 들어 있는 쿼리문을 하나의 테이블로 만들어 준다
+#단점 작업 속도가 느리다 요즘에는 많이 사용하지 않는다
+SELECT *
+FROM (
+    SELECT D.name AS `부서명`,
+    GROUP_CONCAT(E.`name`) AS `사원리스트`,
+    TRUNCATE(AVG(E.salary), 0) AS `평균연봉`,
+    MAX(E.salary) AS `최고연봉`,
+    MIN(E.salary) AS `최소연봉`,
+    COUNT(*) AS `사원수``a6`
+    FROM emp AS E
+    INNER JOIN dept AS D
+    ON E.deptId = D.id
+    WHERE 1
+    GROUP BY E.deptId
+) AS D
+WHERE D.`평균연봉` >= 5000;
